@@ -102,7 +102,7 @@ export function TestCall() {
         </div>
 
         <p className="text-center text-xs text-[#94A3B8] mt-8">
-          Backend must be running at <span className="font-mono text-[#4F7DF3]">localhost:8080</span>
+          Backend must be running at <span className="font-mono text-[#4F7DF3]">localhost:8000</span>
         </p>
       </div>
     </div>
@@ -204,12 +204,31 @@ function CallRoom({ roomId, onEnd }: { roomId: string; onEnd: () => void }) {
             setPeers(msg.peers);
             setStatus("waiting");
             addLog(`Role: ${msg.role}`);
+            // Receiver signals ready immediately after setup
+            if (msg.role === "receiver") {
+              ws.send(JSON.stringify({ type: "ready" }));
+            }
             break;
 
           case "peer-joined":
             setPeers(2);
+            // Initiator creates offer; receiver sends ready signal
             if (roleRef.current === "initiator") {
               addLog("Creating offer…");
+              const offer = await pc.createOffer();
+              await pc.setLocalDescription(offer);
+              ws.send(JSON.stringify({ type: "offer", sdp: offer.sdp }));
+              addLog("→ offer sent");
+            } else {
+              // Receiver: signal ready so initiator knows to (re)send offer
+              ws.send(JSON.stringify({ type: "ready" }));
+            }
+            break;
+
+          case "ready":
+            // Only the initiator acts on this
+            if (roleRef.current === "initiator" && !pc.localDescription) {
+              addLog("Receiver ready — creating offer…");
               const offer = await pc.createOffer();
               await pc.setLocalDescription(offer);
               ws.send(JSON.stringify({ type: "offer", sdp: offer.sdp }));

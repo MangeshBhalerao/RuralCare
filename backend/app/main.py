@@ -226,21 +226,26 @@ async def webrtc_signal(websocket: WebSocket, room_id: str):
         "peers": len(room),
     })
 
-    # If this is the second peer, notify the first one to create an offer
+    # If this is the second peer, notify ALL peers that the room is full.
+    # The initiator (peer 0) must wait for a "ready" message from the receiver
+    # before creating the offer — this avoids the race where the offer arrives
+    # before the receiver's onmessage handler is attached.
     if len(room) == 2:
-        try:
-            await room[0].send_json({"type": "peer-joined"})
-        except Exception:
-            pass
+        for peer in list(room):
+            try:
+                await peer.send_json({"type": "peer-joined", "peers": 2})
+            except Exception:
+                pass
 
     try:
         while True:
             data = await websocket.receive_json()
-            # Relay to the other peer
-            other_idx = 1 - position
-            if other_idx < len(room):
+            # Relay to every other peer in the room (not back to sender)
+            for peer in list(room):
+                if peer is websocket:
+                    continue
                 try:
-                    await room[other_idx].send_json(data)
+                    await peer.send_json(data)
                 except Exception:
                     pass
     except WebSocketDisconnect:

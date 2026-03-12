@@ -100,11 +100,23 @@ function VideoCallRoom({
           case "joined":
             roleRef.current = msg.role;
             setStatus("waiting");
+            if (msg.role === "receiver") {
+              ws.send(JSON.stringify({ type: "ready" }));
+            }
             break;
 
           case "peer-joined":
-            // We are the initiator — create and send the offer
             if (roleRef.current === "initiator") {
+              const offer = await pc.createOffer();
+              await pc.setLocalDescription(offer);
+              ws.send(JSON.stringify({ type: "offer", sdp: offer.sdp }));
+            } else {
+              ws.send(JSON.stringify({ type: "ready" }));
+            }
+            break;
+
+          case "ready":
+            if (roleRef.current === "initiator" && !pc.localDescription) {
               const offer = await pc.createOffer();
               await pc.setLocalDescription(offer);
               ws.send(JSON.stringify({ type: "offer", sdp: offer.sdp }));
