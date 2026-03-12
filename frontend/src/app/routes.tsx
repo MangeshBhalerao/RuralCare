@@ -11,6 +11,8 @@ import { Contact } from "./pages/Contact";
 import { Privacy } from "./pages/Privacy";
 import { NotFound } from "./pages/NotFound";
 import { HealthDashboard } from "./pages/HealthDashboard";
+import { PharmaAdmin } from "./pages/PharmaAdmin";
+import { DoctorAdmin } from "./pages/DoctorAdmin";
 
 export const router = createBrowserRouter([
   {
@@ -27,6 +29,8 @@ export const router = createBrowserRouter([
       { path: "contact", Component: Contact },
       { path: "privacy", Component: Privacy },
       { path: "dashboard", Component: HealthDashboard },
+      { path: "pharma", Component: PharmaAdmin },
+      { path: "doctors", Component: DoctorAdmin },
       { path: "*", Component: NotFound },
     ],
   },
