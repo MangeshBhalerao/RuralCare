@@ -319,7 +319,7 @@ function DoctorCard({ doctor, onEdit, onDelete }: CardProps) {
           <div>
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="font-bold text-[#1E293B] text-[0.95rem]">{doctor.name}</span>
-              {doctor.verified && <BadgeCheck className="w-4 h-4 text-[#4F7DF3] shrink-0" title="Verified" />}
+              {doctor.verified && <span title="Verified"><BadgeCheck className="w-4 h-4 text-[#4F7DF3] shrink-0" /></span>}
             </div>
             <div className="text-xs text-[#94A3B8] mt-0.5">{doctor.qualification}</div>
           </div>

@@ -36,6 +36,22 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
+      '/auth': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/doctors': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/patients': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/medicines': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
     },
   },
 })
