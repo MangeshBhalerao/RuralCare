@@ -3,7 +3,9 @@ import { useNavigate } from "react-router";
 import {
   Video, Phone, MessageCircle, Calendar, Clock, User,
   Mic, MicOff, VideoOff, PhoneOff, Loader2, Wifi, WifiOff, Copy, Check as CheckIcon,
+  X,
 } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -34,6 +36,24 @@ interface Doctor {
   consult_mode: string;   // "Video" | "In-Person" | "Both"
   verified: boolean;
   certificate: string | null;
+  time_slots?: TimeSlot[];
+  appointments?: Appointment[];
+}
+
+interface TimeSlot {
+  day: string;
+  time: string;
+  booked?: boolean;
+}
+
+interface Appointment {
+  appointment_id: number;
+  patient_id: number;
+  patient_name: string;
+  appointment_date: string;
+  time_slot: string;
+  status: string;
+  notes?: string;
 }
 
 
@@ -311,12 +331,22 @@ function VideoCallRoom({
 
 export function TalkToDoctor() {
   const navigate = useNavigate();
-  const [selectedDoctor, setSelectedDoctor]     = useState<number | null>(null);
+  const { user } = useAuth();
+  const [selectedDoctor, setSelectedDoctor]     = useState<Doctor | null>(null);
   const [consultationType, setConsultationType] = useState<"video" | "audio" | null>(null);
 
   const [doctors,     setDoctors]     = useState<Doctor[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(true);
   const [fetchError,  setFetchError]  = useState("");
+
+  const [showBooking, setShowBooking] = useState(false);
+  const [bookingDate, setBookingDate] = useState("");
+  const [bookingTime, setBookingTime] = useState("");
+  const [bookingNotes, setBookingNotes] = useState("");
+  const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [bookingError, setBookingError] = useState("");
+  const [bookingSuccess, setBookingSuccess] = useState("");
 
   useEffect(() => {
     fetch("/doctors/")
@@ -329,11 +359,69 @@ export function TalkToDoctor() {
       .finally(() => setLoadingDocs(false));
   }, []);
 
+  const handleSelectDoctor = (doctor: Doctor) => {
+    setSelectedDoctor(doctor);
+    setShowBooking(false);
+    setAvailableSlots([]);
+  };
+
+  const openBooking = async () => {
+    if (!selectedDoctor) return;
+    
+    setShowBooking(true);
+    setLoadingSlots(true);
+    setBookingError("");
+    
+    try {
+      const res = await fetch(`/doctors/${selectedDoctor.id}/available-slots`);
+      if (!res.ok) throw new Error("Failed to load available slots");
+      const data = await res.json();
+      setAvailableSlots(data.slots || []);
+    } catch (err) {
+      setBookingError(err instanceof Error ? err.message : "Could not load slots");
+    } finally {
+      setLoadingSlots(false);
+    }
+  };
+
+  const handleBookAppointment = async () => {
+    if (!selectedDoctor || !bookingDate || !bookingTime || !user.name) {
+      setBookingError("Please fill in all fields");
+      return;
+    }
+    
+    try {
+      const res = await fetch(`/doctors/${selectedDoctor.id}/book-appointment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patient_id: user.userId || 0,
+          patient_name: user.name,
+          appointment_date: bookingDate,
+          time_slot: bookingTime,
+          notes: bookingNotes,
+        }),
+      });
+      
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.detail ?? "Booking failed");
+      }
+      
+      setBookingSuccess(`Appointment booked with ${selectedDoctor.name}!`);
+      setShowBooking(false);
+      setBookingDate("");
+      setBookingTime("");
+      setBookingNotes("");
+      setTimeout(() => setBookingSuccess(""), 4000);
+    } catch (err) {
+      setBookingError(err instanceof Error ? err.message : "Booking failed");
+    }
+  };
+
   const handleBookAudio = () => {
     if (!selectedDoctor) return;
-    const doctor = doctors.find((d) => d.id === selectedDoctor);
-    if (!doctor) return;
-    alert(`Audio consultation booking for ${doctor.name} — audio-only calls coming soon.`);
+    alert(`Audio consultation booking for ${selectedDoctor.name} — audio-only calls coming soon.`);
   };
 
 
@@ -469,9 +557,9 @@ export function TalkToDoctor() {
                 return (
                   <button
                     key={doctor.id}
-                    onClick={() => setSelectedDoctor(doctor.id)}
+                    onClick={() => handleSelectDoctor(doctor)}
                     className={`p-6 rounded-2xl border-2 transition-all text-left ${
-                      selectedDoctor === doctor.id
+                      selectedDoctor?.id === doctor.id
                         ? "border-[#4F7DF3] bg-[#4F7DF3]/5"
                         : "border-gray-200 hover:border-[#4F7DF3]/50"
                     }`}
@@ -538,15 +626,137 @@ export function TalkToDoctor() {
           )}
         </div>
 
-        {/* Book Audio Consultation Button */}
-        {selectedDoctor && consultationType === "audio" && (
-          <div className="bg-white rounded-2xl p-6 shadow-sm sticky bottom-4">
+        {/* Book Appointment Button */}
+        {selectedDoctor && (
+          <div className="bg-white rounded-2xl p-6 shadow-sm sticky bottom-4 space-y-3">
+            {bookingSuccess && (
+              <div className="px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-700 text-sm">
+                ✓ {bookingSuccess}
+              </div>
+            )}
             <button
-              onClick={handleBookAudio}
+              onClick={openBooking}
               className="w-full px-8 py-4 bg-[#4F7DF3] text-white rounded-2xl hover:bg-[#3D6DE3] transition-colors flex items-center justify-center gap-2 font-semibold"
             >
-              <Phone className="w-5 h-5" /> Book Audio Consultation
+              <Calendar className="w-5 h-5" /> Book Appointment
             </button>
+            {consultationType === "audio" && (
+              <button
+                onClick={handleBookAudio}
+                className="w-full px-8 py-4 bg-white border-2 border-[#4F7DF3] text-[#4F7DF3] rounded-2xl hover:bg-[#F8FAFC] transition-colors flex items-center justify-center gap-2 font-semibold"
+              >
+                <Phone className="w-5 h-5" /> Audio Consultation
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Booking Modal */}
+        {showBooking && selectedDoctor && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+              <div className="sticky top-0 bg-white px-6 pt-6 pb-4 border-b border-[rgba(0,0,0,0.06)] flex items-center justify-between z-10">
+                <div>
+                  <h2 className="text-xl font-bold text-[#1E293B]">Book Appointment</h2>
+                  <p className="text-sm text-[#64748B] mt-1">{selectedDoctor.name}</p>
+                </div>
+                <button
+                  onClick={() => setShowBooking(false)}
+                  className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-[#F8FAFC] text-[#64748B] transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleBookAppointment();
+                }}
+                className="px-6 py-5 space-y-5"
+              >
+                {bookingError && (
+                  <div className="px-4 py-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-sm">
+                    {bookingError}
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-semibold text-[#1E293B] mb-1.5">Select Date *</label>
+                  <input
+                    required
+                    type="date"
+                    value={bookingDate}
+                    onChange={(e) => setBookingDate(e.target.value)}
+                    min={new Date().toISOString().split('T')[0]}
+                    className="w-full px-3.5 py-2.5 border border-[rgba(0,0,0,0.1)] rounded-xl text-sm text-[#1E293B] bg-white outline-none transition focus:border-[#4F7DF3] focus:ring-2 focus:ring-[#4F7DF3]/20"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[#1E293B] mb-2">Select Time *</label>
+                  {loadingSlots ? (
+                    <div className="flex items-center justify-center py-6 text-[#64748B] gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Loading available slots...
+                    </div>
+                  ) : availableSlots.length === 0 ? (
+                    <div className="py-6 text-center text-[#64748B] text-sm">
+                      No available slots found. Please select a different date.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-2">
+                      {availableSlots.map((slot) => (
+                        <button
+                          key={`${slot.day}_${slot.time}`}
+                          type="button"
+                          onClick={() => setBookingTime(slot.time)}
+                          disabled={slot.booked}
+                          className={`px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                            slot.booked
+                              ? "bg-gray-100 text-[#94A3B8] cursor-not-allowed opacity-50"
+                              : bookingTime === slot.time
+                              ? "bg-[#4F7DF3] text-white"
+                              : "bg-[#F8FAFC] border border-[rgba(0,0,0,0.08)] text-[#1E293B] hover:border-[#4F7DF3]"
+                          }`}
+                        >
+                          {slot.time}
+                          {slot.booked && <span className="text-[10px] block mt-0.5">Booked</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[#1E293B] mb-1.5">Notes (Optional)</label>
+                  <textarea
+                    value={bookingNotes}
+                    onChange={(e) => setBookingNotes(e.target.value)}
+                    placeholder="Any additional notes or symptoms..."
+                    className="w-full px-3.5 py-2.5 border border-[rgba(0,0,0,0.1)] rounded-xl text-sm text-[#1E293B] bg-white outline-none transition focus:border-[#4F7DF3] focus:ring-2 focus:ring-[#4F7DF3]/20 placeholder:text-[#94A3B8] resize-none"
+                    rows={3}
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowBooking(false)}
+                    className="flex-1 py-2.5 rounded-full border border-[rgba(0,0,0,0.1)] text-[#64748B] hover:bg-[#F8FAFC] transition-colors text-sm font-semibold"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!bookingDate || !bookingTime}
+                    className="flex-1 py-2.5 rounded-full bg-[#4F7DF3] hover:bg-[#3D6DE3] disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-bold transition-colors shadow-[0_2px_10px_rgba(79,125,243,0.3)]"
+                  >
+                    Confirm Booking
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
       </div>

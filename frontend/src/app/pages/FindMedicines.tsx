@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Search, MapPin, Phone, Clock, CheckCircle, Package, Loader2 } from "lucide-react";
+import { Search, MapPin, Phone, Clock, CheckCircle, Package, Loader2, AlertCircle } from "lucide-react";
 
 interface MedicineSuggestion {
   id: number;
@@ -8,6 +8,19 @@ interface MedicineSuggestion {
   brand: string;
   form: string;
   stock: number;
+}
+
+interface Pharmacy {
+  id: number;
+  pharmacist_name: string;
+  store_name: string;
+  phone: string;
+  address: string;
+  city: string;
+  state: string;
+  pincode: string;
+  opening_hours: string;
+  verified: boolean;
 }
 
 interface PharmacyAvailability {
@@ -30,58 +43,60 @@ export function FindMedicines() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedMedicine, setSelectedMedicine] = useState<MedicineSuggestion | null>(null);
   const [medicineSuggestions, setMedicineSuggestions] = useState<MedicineSuggestion[]>([]);
-  const [pharmacies, setPharmacies] = useState<PharmacyAvailability[]>([]);
+  const [allPharmacies, setAllPharmacies] = useState<Pharmacy[]>([]);
+  const [availabilityMap, setAvailabilityMap] = useState<Record<number, number>>({});
   const [loadingMedicines, setLoadingMedicines] = useState(false);
-  const [loadingPharmacies, setLoadingPharmacies] = useState(false);
+  const [loadingPharmacies, setLoadingPharmacies] = useState(true);
+  const [loadingAvailability, setLoadingAvailability] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
-    const loadSuggestions = async () => {
-      if (!searchQuery.trim()) {
-        setMedicineSuggestions([]);
-        return;
-      }
-
-      setLoadingMedicines(true);
+    const loadPharmacies = async () => {
+      setLoadingPharmacies(true);
       try {
-        const response = await fetch(`/medicines/?q=${encodeURIComponent(searchQuery.trim())}&limit=12`);
-        if (!response.ok) throw new Error("Failed to load medicines");
-        const data: MedicineSuggestion[] = await response.json();
-        if (!cancelled) setMedicineSuggestions(data);
+        const response = await fetch("/pharmacies/?limit=500");
+        if (!response.ok) throw new Error("Failed to load pharmacies");
+        const data: Pharmacy[] = await response.json();
+        if (!cancelled) setAllPharmacies(data);
       } catch {
-        if (!cancelled) setMedicineSuggestions([]);
+        if (!cancelled) setAllPharmacies([]);
       } finally {
-        if (!cancelled) setLoadingMedicines(false);
+        if (!cancelled) setLoadingPharmacies(false);
       }
     };
 
-    const timeout = window.setTimeout(loadSuggestions, 180);
+    loadPharmacies();
     return () => {
       cancelled = true;
-      window.clearTimeout(timeout);
     };
-  }, [searchQuery]);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
 
     const loadAvailability = async () => {
       if (!selectedMedicine) {
-        setPharmacies([]);
+        setAvailabilityMap({});
         return;
       }
 
-      setLoadingPharmacies(true);
+      setLoadingAvailability(true);
       try {
         const response = await fetch(`/pharmacies/availability?medicine_id=${selectedMedicine.id}`);
         if (!response.ok) throw new Error("Failed to load pharmacy availability");
         const data: PharmacyAvailability[] = await response.json();
-        if (!cancelled) setPharmacies(data);
+        if (!cancelled) {
+          const map: Record<number, number> = {};
+          data.forEach((item) => {
+            map[item.pharmacy_id] = item.quantity_available;
+          });
+          setAvailabilityMap(map);
+        }
       } catch {
-        if (!cancelled) setPharmacies([]);
+        if (!cancelled) setAvailabilityMap({});
       } finally {
-        if (!cancelled) setLoadingPharmacies(false);
+        if (!cancelled) setLoadingAvailability(false);
       }
     };
 
@@ -173,81 +188,105 @@ export function FindMedicines() {
           <div className="lg:col-span-2">
             <div className="bg-white rounded-2xl p-6 md:p-8 shadow-sm mb-6">
               <h2 className="text-xl text-[#1E293B] mb-6" style={{ fontWeight: 600 }}>
-                Nearby Pharmacies
+                All Pharmacies
                 {selectedMedicine && (
                   <span className="text-[#64748B] ml-2">
-                    - Showing availability for "{selectedMedicine.name}"
+                    - Availability for "{selectedMedicine.name}"
                   </span>
                 )}
               </h2>
 
               <div className="space-y-4">
-                {!selectedMedicine ? (
-                  <div className="py-12 text-center text-[#64748B]">
-                    <Package className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                    Select a medicine from the left to see only stores that have it.
-                  </div>
-                ) : loadingPharmacies ? (
+                {loadingPharmacies ? (
                   <div className="py-12 text-center text-[#64748B] flex items-center justify-center gap-2">
                     <Loader2 className="w-5 h-5 animate-spin" /> Loading pharmacies...
                   </div>
-                ) : pharmacies.length === 0 ? (
+                ) : allPharmacies.length === 0 ? (
                   <div className="py-12 text-center text-[#64748B]">
-                    No stores currently have this medicine in stock.
+                    <Package className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                    No pharmacies available at the moment.
                   </div>
-                ) : pharmacies.map((pharmacy) => (
-                  <div
-                    key={pharmacy.pharmacy_id}
-                    className="p-6 rounded-2xl border-2 border-gray-200 hover:border-[#4F7DF3]/50 transition-all"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
-                      <div className="flex-1">
-                        <div className="flex items-start justify-between mb-2">
-                          <h3
-                            className="text-lg text-[#1E293B]"
-                            style={{ fontWeight: 600 }}
-                          >
-                            {pharmacy.store_name}
-                          </h3>
+                ) : allPharmacies.map((pharmacy) => {
+                  const hasStock = selectedMedicine && availabilityMap[pharmacy.id] !== undefined;
+                  const quantity = availabilityMap[pharmacy.id] ?? 0;
+
+                  return (
+                    <div
+                      key={pharmacy.id}
+                      className={`p-6 rounded-2xl border-2 transition-all ${
+                        hasStock
+                          ? "border-emerald-200 bg-emerald-50/30"
+                          : selectedMedicine
+                          ? "border-gray-200 bg-gray-50/30"
+                          : "border-gray-200"
+                      } hover:border-[#4F7DF3]/50`}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
+                        <div className="flex-1">
+                          <div className="flex items-start justify-between mb-2">
+                            <h3
+                              className="text-lg text-[#1E293B]"
+                              style={{ fontWeight: 600 }}
+                            >
+                              {pharmacy.store_name}
+                            </h3>
+                          </div>
+
+                          <div className="space-y-2 text-sm text-[#64748B]">
+                            <div className="flex items-center gap-2">
+                              <MapPin className="w-4 h-4 flex-shrink-0" />
+                              <span>{[pharmacy.address, pharmacy.city, pharmacy.state, pharmacy.pincode].filter(Boolean).join(", ") || "Address not available"}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Phone className="w-4 h-4 flex-shrink-0" />
+                              {pharmacy.phone ? (
+                                <a
+                                  href={`tel:${pharmacy.phone}`}
+                                  className="hover:text-[#4F7DF3] transition-colors"
+                                >
+                                  {pharmacy.phone}
+                                </a>
+                              ) : (
+                                <span>Contact not available</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Clock className="w-4 h-4 flex-shrink-0" />
+                              <span>{pharmacy.opening_hours || "Hours not available"}</span>
+                            </div>
+                          </div>
                         </div>
 
-                        <div className="space-y-2 text-sm text-[#64748B]">
-                          <div className="flex items-center gap-2">
-                            <MapPin className="w-4 h-4 flex-shrink-0" />
-                            <span>{[pharmacy.address, pharmacy.city, pharmacy.state, pharmacy.pincode].filter(Boolean).join(", ") || "Address not available"}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Phone className="w-4 h-4 flex-shrink-0" />
-                            {pharmacy.phone ? (
-                              <a
-                                href={`tel:${pharmacy.phone}`}
-                                className="hover:text-[#4F7DF3] transition-colors"
-                              >
-                                {pharmacy.phone}
-                              </a>
+                        <div className="flex flex-col gap-2 items-start sm:items-end">
+                          {selectedMedicine && (
+                            hasStock ? (
+                              <>
+                                <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-semibold">
+                                  Qty: {quantity}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <CheckCircle className="w-5 h-5 text-emerald-500" />
+                                  <span className="text-sm text-emerald-600" style={{ fontWeight: 600 }}>
+                                    In Stock
+                                  </span>
+                                </div>
+                              </>
                             ) : (
-                              <span>Contact not available</span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Clock className="w-4 h-4 flex-shrink-0" />
-                            <span>{pharmacy.opening_hours || "Hours not available"}</span>
-                          </div>
+                              <>
+                                <span className="px-3 py-1 bg-rose-100 text-rose-700 rounded-full text-sm font-semibold">
+                                  Out of Stock
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <AlertCircle className="w-5 h-5 text-rose-500" />
+                                  <span className="text-sm text-rose-600" style={{ fontWeight: 600 }}>
+                                    Not Available
+                                  </span>
+                                </div>
+                              </>
+                            )
+                          )}
                         </div>
                       </div>
-
-                      <div className="flex flex-col gap-2 items-start sm:items-end">
-                        <span className="px-3 py-1 bg-[#F8FAFC] text-[#64748B] rounded-full text-sm">
-                          Qty: {pharmacy.quantity_available}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className="w-5 h-5 text-emerald-500" />
-                          <span className="text-sm text-emerald-600" style={{ fontWeight: 600 }}>
-                            In Stock
-                          </span>
-                        </div>
-                      </div>
-                    </div>
 
                     <div className="flex flex-col sm:flex-row gap-3">
                       {pharmacy.phone ? (
@@ -267,7 +306,8 @@ export function FindMedicines() {
                       </button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>

@@ -39,6 +39,8 @@ class Doctor(Base):
     consult_mode  = Column(String, default="Both")        # Video / In-Person / Both
     verified      = Column(Boolean, default=False)
     certificate   = Column(String, nullable=True)         # filename or URL
+    time_slots    = Column(JSONB, default=list)           # Available time slots per day
+    appointments  = Column(JSONB, default=list)           # Booked appointments
 
 
 # -------------------------
