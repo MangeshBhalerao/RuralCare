@@ -13,6 +13,8 @@ import { NotFound } from "./pages/NotFound";
 import { HealthDashboard } from "./pages/HealthDashboard";
 import { PharmaAdmin } from "./pages/PharmaAdmin";
 import { DoctorAdmin } from "./pages/DoctorAdmin";
+import { TestCall } from "./pages/TestCall";
+import { TestChat } from "./pages/TestChat";
 
 export const router = createBrowserRouter([
   {
@@ -31,6 +33,8 @@ export const router = createBrowserRouter([
       { path: "dashboard", Component: HealthDashboard },
       { path: "pharma", Component: PharmaAdmin },
       { path: "doctors", Component: DoctorAdmin },
+      { path: "test-call", Component: TestCall },
+      { path: "test-chat", Component: TestChat },
       { path: "*", Component: NotFound },
     ],
   },
