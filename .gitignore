@@ -5,3 +5,5 @@ venv
 frontend/.env
 backend/app/config/dev.env
 backend/app/config/*.local.env
+
+RuralCare_Documentation.md

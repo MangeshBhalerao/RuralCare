@@ -4,10 +4,12 @@ import {
   Video, VideoOff, Mic, MicOff, PhoneOff, Copy, Check, Share2,
   Wifi, WifiOff, Loader2, Users, Plus, LogIn,
 } from "lucide-react";
+import { API_BASE_URL, toWsUrl } from "../config/runtime";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const SIGNAL_WS_BASE = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws/signal`;
+const SIGNAL_WS_BASE = toWsUrl("/ws/signal");
+const BACKEND_LABEL = API_BASE_URL || window.location.origin;
 const ICE_SERVERS = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
@@ -105,7 +107,7 @@ export function TestCall() {
         </div>
 
         <p className="text-center text-xs text-[#94A3B8] mt-8">
-          Backend must be running at <span className="font-mono text-[#4F7DF3]">localhost:8000</span>
+          Backend endpoint: <span className="font-mono text-[#4F7DF3]">{BACKEND_LABEL}</span>
         </p>
       </div>
     </div>

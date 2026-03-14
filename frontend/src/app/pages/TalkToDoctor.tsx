@@ -6,10 +6,11 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { toWsUrl } from "../config/runtime";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const SIGNAL_WS_BASE = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws/signal`;
+const SIGNAL_WS_BASE = toWsUrl("/ws/signal");
 const _BACKEND_BASE = `${window.location.protocol}//${window.location.host}`;
 const ICE_SERVERS = [
   { urls: "stun:stun.l.google.com:19302" },

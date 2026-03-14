@@ -2,10 +2,11 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Copy, Check, MessageCircle, Plus, LogIn, Send, Users, ArrowLeft,
 } from "lucide-react";
+import { toWsUrl } from "../config/runtime";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const CHAT_WS_BASE = `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/ws/chat`;
+const CHAT_WS_BASE = toWsUrl("/ws/chat");
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
