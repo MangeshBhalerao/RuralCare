@@ -51,8 +51,8 @@ By combining real-time communication (WebRTC) and advanced Artificial Intelligen
 
 ## 🌍 Deployment URLs
 
-- Frontend: https://ruralcare-rust.vercel.app
-- Backend API: https://ruralcare-by09.onrender.com
+- Live links : https://ruralcare-rust.vercel.app
+
 
 ### Prerequisites
 - Python 3.10+ & Pipenv
